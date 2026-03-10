@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VibeBattle — Голосование в реальном времени</title>
+<style>
+/* ==============================
+   RESET & BASE
+   ============================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0d1117;
+  --card: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --radius: 12px;
+  --accent: #3B82F6;
+  --green: #10B981;
+  --red: #EF4444;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ==============================
+   LAYOUT
+   ============================== */
+.container {
+  width: 100%;
+  max-width: 600px;
+  padding: 24px 16px 80px;
+}
+
+/* ==============================
+   HEADER
+   ============================== */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 0 32px;
+}
+.header-emoji {
+  font-size: 32px;
+  filter: drop-shadow(0 0 12px rgba(251, 191, 36, 0.4));
+}
+.header-text {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #e6edf3, #8b949e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ==============================
+   LIVE INDICATOR
+   ============================== */
+.live-badge {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green);
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 4px 10px;
+  border-radius: 20px;
+  z-index: 100;
+}
+.live-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+/* ==============================
+   CREATE SCREEN
+   ============================== */
+.screen {
+  animation: fadeIn 0.4s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.screen-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+.screen-subtitle {
+  color: var(--text-dim);
+  font-size: 14px;
+  margin-bottom: 28px;
+  line-height: 1.5;
+}
+
+.input-group {
+  margin-bottom: 24px;
+}
+.input-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.input-field {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.input-field:focus {
+  border-color: var(--accent);
+}
+.input-field::placeholder {
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+/* Team rows */
+.teams-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.team-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: slideIn 0.25s ease;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.team-color-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(255,255,255,0.1);
+}
+.team-row .input-field {
+  flex: 1;
+}
+.btn-remove-team {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.btn-remove-team:hover {
+  border-color: var(--red);
+  color: var(--red);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.btn-add-team {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-add-team:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 14px 24px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  margin-top: 24px;
+}
+.btn-primary:hover {
+  background: #2563EB;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ==============================
+   SUCCESS SCREEN (link ready)
+   ============================== */
+.success-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  text-align: center;
+}
+.success-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+.success-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.success-desc {
+  color: var(--text-dim);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+.link-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--accent);
+  word-break: break-all;
+  margin-bottom: 16px;
+  text-align: left;
+  line-height: 1.5;
+}
+.btn-row {
+  display: flex;
+  gap: 10px;
+}
+.btn-row .btn-primary {
+  margin-top: 0;
+  flex: 1;
+}
+.btn-secondary {
+  flex: 1;
+  padding: 14px 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-secondary:hover {
+  border-color: var(--text-dim);
+  background: #1c2333;
+}
+
+/* ==============================
+   VOTE SCREEN
+   ============================== */
+.vote-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: -0.3px;
+}
+.vote-subtitle {
+  color: var(--text-dim);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.vote-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.vote-card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 56px;
+}
+.vote-card:hover:not(.voted):not(.disabled) {
+  border-color: #58636e;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.vote-card.disabled {
+  cursor: default;
+}
+.vote-card.voted {
+  cursor: default;
+}
+.vote-card.chosen {
+  border-color: var(--green);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.15);
+}
+
+/* Progress bar behind card content */
+.vote-card-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  opacity: 0.12;
+  transition: width 0.5s ease;
+  border-radius: var(--radius);
+}
+
+.vote-card-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  gap: 12px;
+  z-index: 1;
+}
+
+.vote-card-stripe {
+  width: 4px;
+  height: 28px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.vote-card-name {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.vote-card-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.vote-card-count {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.vote-card-pct {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  text-align: right;
+}
+
+.vote-card-check {
+  color: var(--green);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* Pulse animation on vote */
+@keyframes card-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  70% { box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+.vote-card.pulse {
+  animation: card-pulse 0.6s ease;
+}
+
+/* Card entrance */
+.vote-card {
+  animation: cardIn 0.35s ease backwards;
+}
+.vote-card:nth-child(1) { animation-delay: 0.05s; }
+.vote-card:nth-child(2) { animation-delay: 0.1s; }
+.vote-card:nth-child(3) { animation-delay: 0.15s; }
+.vote-card:nth-child(4) { animation-delay: 0.2s; }
+.vote-card:nth-child(5) { animation-delay: 0.25s; }
+.vote-card:nth-child(6) { animation-delay: 0.3s; }
+.vote-card:nth-child(7) { animation-delay: 0.35s; }
+.vote-card:nth-child(8) { animation-delay: 0.4s; }
+.vote-card:nth-child(9) { animation-delay: 0.45s; }
+.vote-card:nth-child(10) { animation-delay: 0.5s; }
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.total-votes {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+  padding: 8px 0;
+}
+
+.voted-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 500;
+  animation: fadeIn 0.4s ease;
+}
+
+/* ==============================
+   ERROR SCREEN
+   ============================== */
+.error-box {
+  text-align: center;
+  padding: 60px 20px;
+}
+.error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+.error-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.error-desc {
+  color: var(--text-dim);
+  font-size: 14px;
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+/* ==============================
+   LOADING
+   ============================== */
+.loading {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-dim);
+}
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==============================
+   FOOTER
+   ============================== */
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  opacity: 0.5;
+  background: linear-gradient(transparent, var(--bg));
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<div class="container" id="app"></div>
+<div class="footer">Сделано с ❤️ и вайбкодингом</div>
+
+<script>
+// ============================================================
+//  НАСТРОЙКА JSONBIN.IO
+// ============================================================
+// 1. Зарегистрируйся на https://jsonbin.io (30 секунд)
+// 2. Скопируй свой X-Master-Key из раздела API Keys
+// 3. Создай Access Key с правами: create, read, update
+// 4. Вставь оба ключа ниже
+const JSONBIN_API_KEY    = 'ВСТАВЬ_СВОЙ_API_KEY';       // Master Key
+const JSONBIN_ACCESS_KEY = 'ВСТАВЬ_СВОЙ_ACCESS_KEY';    // Access Key
+
+// ============================================================
+//  ПАЛИТРА ЦВЕТОВ ДЛЯ КОМАНД
+// ============================================================
+const TEAM_COLORS = [
+  '#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6',
+  '#EC4899','#06B6D4','#F97316','#84CC16','#6366F1'
+];
+
+const app = document.getElementById('app');
+let pollInterval = null;
+
+// ============================================================
+//  УТИЛИТЫ
+// ============================================================
+function getParam(name) {
+  return new URLSearchParams(window.location.search).get(name);
+}
+
+function fingerprint(binId) {
+  return btoa(navigator.userAgent + screen.width + screen.height + binId);
+}
+
+function getVotedTeam(binId) {
+  try {
+    const v = localStorage.getItem('vibebattle_' + binId);
+    return v !== null ? parseInt(v, 10) : null;
+  } catch { return null; }
+}
+
+function saveVote(binId, teamIdx) {
+  try { localStorage.setItem('vibebattle_' + binId, teamIdx); } catch {}
+}
+
+// ============================================================
+//  API ОБЁРТКИ
+// ============================================================
+async function apiCreate(data) {
+  const res = await fetch('https://api.jsonbin.io/v3/b', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Master-Key': JSONBIN_API_KEY,
+      'X-Access-Key': JSONBIN_ACCESS_KEY
+    },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error('Ошибка создания: ' + res.status);
+  return await res.json();
+}
+
+async function apiRead(binId) {
+  const res = await fetch('https://api.jsonbin.io/v3/b/' + binId + '/latest', {
+    headers: {
+      'X-Master-Key': JSONBIN_API_KEY,
+      'X-Access-Key': JSONBIN_ACCESS_KEY
+    }
+  });
+  if (!res.ok) throw new Error('Ошибка чтения: ' + res.status);
+  return await res.json();
+}
+
+async function apiUpdate(binId, data) {
+  const res = await fetch('https://api.jsonbin.io/v3/b/' + binId, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Master-Key': JSONBIN_API_KEY,
+      'X-Access-Key': JSONBIN_ACCESS_KEY
+    },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error('Ошибка обновления: ' + res.status);
+  return await res.json();
+}
+
+// ============================================================
+//  РОУТЕР
+// ============================================================
+function init() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  const binId = getParam('id');
+  if (binId) {
+    showVoteScreen(binId);
+  } else {
+    showCreateScreen();
+  }
+}
+
+// ============================================================
+//  ЭКРАН СОЗДАНИЯ ГОЛОСОВАНИЯ
+// ============================================================
+function showCreateScreen() {
+  let teams = [
+    { name: '', color: TEAM_COLORS[0] },
+    { name: '', color: TEAM_COLORS[1] }
+  ];
+
+  function render() {
+    app.innerHTML = `
+      <div class="header">
+        <span class="header-emoji">🏆</span>
+        <span class="header-text">VibeBattle</span>
+      </div>
+      <div class="screen">
+        <div class="screen-title">Новое голосование</div>
+        <div class="screen-subtitle">Создайте голосование, поделитесь ссылкой — участники увидят результаты в реальном времени</div>
+
+        <div class="input-group">
+          <label class="input-label">Название</label>
+          <input class="input-field" id="poll-title" placeholder="Например: Лучший проект хакатона" maxlength="100" />
+        </div>
+
+        <div class="input-group">
+          <label class="input-label">Команды</label>
+          <div class="teams-list" id="teams-list">
+            ${teams.map((t, i) => `
+              <div class="team-row">
+                <div class="team-color-dot" style="background:${t.color}"></div>
+                <input class="input-field team-name" data-idx="${i}" placeholder="Команда ${i + 1}" value="${escHtml(t.name)}" maxlength="60" />
+                ${teams.length > 2 ? `<button class="btn-remove-team" data-remove="${i}" title="Удалить">×</button>` : ''}
+              </div>
+            `).join('')}
+          </div>
+          ${teams.length < 10 ? '<button class="btn-add-team" id="btn-add">+ Добавить команду</button>' : ''}
+        </div>
+
+        <button class="btn-primary" id="btn-create">Создать голосование</button>
+      </div>
+    `;
+
+    // Слушатели ввода имён команд
+    document.querySelectorAll('.team-name').forEach(inp => {
+      inp.addEventListener('input', () => {
+        teams[+inp.dataset.idx].name = inp.value;
+      });
+    });
+
+    // Удаление команды
+    document.querySelectorAll('[data-remove]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        teams.splice(+btn.dataset.remove, 1);
+        render();
+      });
+    });
+
+    // Добавление команды
+    const addBtn = document.getElementById('btn-add');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        teams.push({ name: '', color: TEAM_COLORS[teams.length] });
+        render();
+        // Фокус на новое поле
+        setTimeout(() => {
+          const inputs = document.querySelectorAll('.team-name');
+          inputs[inputs.length - 1]?.focus();
+        }, 50);
+      });
+    }
+
+    // Создать
+    document.getElementById('btn-create').addEventListener('click', handleCreate);
+  }
+
+  async function handleCreate() {
+    const titleInput = document.getElementById('poll-title');
+    const title = titleInput.value.trim() || 'Голосование';
+    const btn = document.getElementById('btn-create');
+
+    // Валидация: хотя бы 2 непустых названия
+    const validTeams = teams.filter(t => t.name.trim());
+    if (validTeams.length < 2) {
+      titleInput.style.borderColor = '';
+      // Подсветить пустые
+      document.querySelectorAll('.team-name').forEach(inp => {
+        if (!inp.value.trim()) {
+          inp.style.borderColor = 'var(--red)';
+          setTimeout(() => inp.style.borderColor = '', 1500);
+        }
+      });
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Создаём...';
+
+    try {
+      const data = {
+        title,
+        teams: teams.map(t => ({
+          name: t.name.trim() || 'Без названия',
+          color: t.color
+        })),
+        votes: [],
+        created: Date.now(),
+        closed: false
+      };
+
+      const resp = await apiCreate(data);
+      const binId = resp.metadata.id;
+      showSuccessScreen(binId, title);
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Создать голосование';
+      showInlineError(err.message);
+    }
+  }
+
+  render();
+}
+
+// ============================================================
+//  ЭКРАН УСПЕШНОГО СОЗДАНИЯ
+// ============================================================
+function showSuccessScreen(binId, title) {
+  const link = window.location.origin + window.location.pathname + '?id=' + binId;
+
+  app.innerHTML = `
+    <div class="header">
+      <span class="header-emoji">🏆</span>
+      <span class="header-text">VibeBattle</span>
+    </div>
+    <div class="screen">
+      <div class="success-box">
+        <div class="success-icon">🎉</div>
+        <div class="success-title">Голосование создано!</div>
+        <div class="success-desc">Отправьте эту ссылку участникам — они смогут проголосовать прямо в браузере</div>
+        <div class="link-box" id="link-text">${escHtml(link)}</div>
+        <div class="btn-row">
+          <button class="btn-secondary" id="btn-copy">📋 Скопировать</button>
+          <button class="btn-primary" id="btn-open">Открыть →</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('btn-copy').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      const btn = document.getElementById('btn-copy');
+      btn.textContent = 'Скопировано ✓';
+      setTimeout(() => btn.textContent = '📋 Скопировать', 2000);
+    } catch {
+      // Фоллбэк
+      prompt('Скопируйте ссылку:', link);
+    }
+  });
+
+  document.getElementById('btn-open').addEventListener('click', () => {
+    window.location.href = link;
+  });
+}
+
+// ============================================================
+//  ЭКРАН ГОЛОСОВАНИЯ
+// ============================================================
+async function showVoteScreen(binId) {
+  app.innerHTML = `
+    <div class="header">
+      <span class="header-emoji">🏆</span>
+      <span class="header-text">VibeBattle</span>
+    </div>
+    <div class="loading">
+      <div class="spinner"></div>
+      Загрузка голосования...
+    </div>
+  `;
+
+  try {
+    const resp = await apiRead(binId);
+    const data = resp.record;
+    renderVote(binId, data);
+    startPolling(binId);
+  } catch (err) {
+    showErrorScreen('Не удалось загрузить голосование', 'Проверьте ссылку и попробуйте ещё раз. Возможно, голосование было удалено или ключи API не настроены.');
+  }
+}
+
+function renderVote(binId, data) {
+  const voted = getVotedTeam(binId);
+  const hasVoted = voted !== null;
+  const totalVotes = data.votes.length;
+
+  // Считаем голоса по командам
+  const counts = data.teams.map(() => 0);
+  data.votes.forEach(v => { if (counts[v.team] !== undefined) counts[v.team]++; });
+
+  app.innerHTML = `
+    <div class="header">
+      <span class="header-emoji">🏆</span>
+      <span class="header-text">VibeBattle</span>
+    </div>
+    <div class="live-badge"><span class="live-dot"></span> Live</div>
+    <div class="screen" id="vote-screen">
+      <div class="vote-title">${escHtml(data.title)}</div>
+      <div class="vote-subtitle">${hasVoted ? 'Результаты обновляются в реальном времени' : 'Нажмите на команду, чтобы проголосовать'}</div>
+
+      ${hasVoted ? `
+        <div class="voted-banner">
+          ✅ Вы проголосовали за «${escHtml(data.teams[voted]?.name || '?')}»
+        </div>
+      ` : ''}
+
+      <div class="vote-cards" id="vote-cards">
+        ${data.teams.map((team, i) => {
+          const count = counts[i];
+          const pct = totalVotes > 0 ? Math.round(count / totalVotes * 100) : 0;
+          const isChosen = voted === i;
+          const cardClass = hasVoted
+            ? (isChosen ? 'vote-card chosen disabled' : 'vote-card disabled')
+            : 'vote-card';
+          return `
+            <div class="${cardClass}" data-team="${i}">
+              <div class="vote-card-progress" style="width:${pct}%;background:${team.color}"></div>
+              <div class="vote-card-content">
+                <div class="vote-card-stripe" style="background:${team.color}"></div>
+                <div class="vote-card-name">${escHtml(team.name)}</div>
+                <div class="vote-card-stats">
+                  <span class="vote-card-count">${count}</span>
+                  <span class="vote-card-pct">${pct}%</span>
+                </div>
+                ${isChosen ? '<span class="vote-card-check">✓</span>' : ''}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <div class="total-votes">Всего проголосовало: <strong>${totalVotes}</strong> чел.</div>
+    </div>
+  `;
+
+  // Если не голосовал — навесить обработчики
+  if (!hasVoted) {
+    document.querySelectorAll('.vote-card').forEach(card => {
+      card.addEventListener('click', () => handleVote(binId, +card.dataset.team));
+    });
+  }
+}
+
+async function handleVote(binId, teamIdx) {
+  // Двойная проверка
+  if (getVotedTeam(binId) !== null) {
+    showInlineError('Вы уже голосовали в этом голосовании');
+    return;
+  }
+
+  // Блокируем карточки
+  document.querySelectorAll('.vote-card').forEach(c => {
+    c.classList.add('disabled');
+    c.style.pointerEvents = 'none';
+  });
+
+  try {
+    // Забираем актуальные данные
+    const resp = await apiRead(binId);
+    const data = resp.record;
+
+    // Добавляем голос
+    data.votes.push({
+      team: teamIdx,
+      odiv: fingerprint(binId),
+      timestamp: Date.now()
+    });
+
+    // Сохраняем
+    await apiUpdate(binId, data);
+    saveVote(binId, teamIdx);
+
+    // Перерисовываем с анимацией
+    renderVote(binId, data);
+
+    // Пульсация выбранной карточки
+    setTimeout(() => {
+      const cards = document.querySelectorAll('.vote-card');
+      if (cards[teamIdx]) cards[teamIdx].classList.add('pulse');
+    }, 50);
+
+  } catch (err) {
+    showInlineError('Ошибка при голосовании: ' + err.message);
+    // Разблокируем
+    document.querySelectorAll('.vote-card').forEach(c => {
+      c.classList.remove('disabled');
+      c.style.pointerEvents = '';
+    });
+  }
+}
+
+// ============================================================
+//  АВТООБНОВЛЕНИЕ
+// ============================================================
+function startPolling(binId) {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async () => {
+    try {
+      const resp = await apiRead(binId);
+      const data = resp.record;
+      // Мягкое обновление — только цифры и полоски
+      updateStats(data);
+    } catch {
+      // Молча пропускаем ошибки поллинга
+    }
+  }, 5000);
+}
+
+function updateStats(data) {
+  const totalVotes = data.votes.length;
+  const counts = data.teams.map(() => 0);
+  data.votes.forEach(v => { if (counts[v.team] !== undefined) counts[v.team]++; });
+
+  const cards = document.querySelectorAll('.vote-card');
+  cards.forEach((card, i) => {
+    const count = counts[i] || 0;
+    const pct = totalVotes > 0 ? Math.round(count / totalVotes * 100) : 0;
+
+    const progress = card.querySelector('.vote-card-progress');
+    const countEl = card.querySelector('.vote-card-count');
+    const pctEl = card.querySelector('.vote-card-pct');
+
+    if (progress) progress.style.width = pct + '%';
+    if (countEl) countEl.textContent = count;
+    if (pctEl) pctEl.textContent = pct + '%';
+  });
+
+  const totalEl = document.querySelector('.total-votes');
+  if (totalEl) totalEl.innerHTML = `Всего проголосовало: <strong>${totalVotes}</strong> чел.`;
+}
+
+// ============================================================
+//  ЭКРАН ОШИБКИ
+// ============================================================
+function showErrorScreen(title, desc) {
+  app.innerHTML = `
+    <div class="header">
+      <span class="header-emoji">🏆</span>
+      <span class="header-text">VibeBattle</span>
+    </div>
+    <div class="error-box">
+      <div class="error-icon">😵</div>
+      <div class="error-title">${escHtml(title)}</div>
+      <div class="error-desc">${escHtml(desc)}</div>
+      <button class="btn-primary" onclick="window.location.href=window.location.pathname" style="max-width:240px;margin:0 auto">
+        ← Создать новое
+      </button>
+    </div>
+  `;
+}
+
+function showInlineError(msg) {
+  // Показать временное уведомление поверх контента
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    background: var(--red); color: #fff; padding: 10px 20px;
+    border-radius: 8px; font-size: 14px; z-index: 999;
+    animation: fadeIn 0.3s ease; max-width: 90%; text-align: center;
+  `;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ============================================================
+//  ПОМОЩНИКИ
+// ============================================================
+function escHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// ============================================================
+//  СТАРТ
+// ============================================================
+init();
+</script>
+
+</body>
+</html>
